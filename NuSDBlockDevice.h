@@ -105,7 +105,8 @@ public:
 private:
     int _init_sdh();
     uint32_t _sd_sectors();
-    
+    void _sdh_irq();
+
     uint32_t _sectors;
     bool _is_initialized;
     bool _dbg;
@@ -115,8 +116,10 @@ private:
 #if defined(TARGET_NUMAKER_PFM_NUC472)
     uint32_t    _sdh_port;
 #elif defined(TARGET_NUMAKER_PFM_M487)
-    SDH_T *     _sdh_base;
+    SDH_T *             _sdh_base;
+    IRQn_Type           _sdh_irqn;
 #endif
+    CThunk<NuSDBlockDevice>     _sdh_irq_thunk;
 
     PinName _sd_dat0;
     PinName _sd_dat1;

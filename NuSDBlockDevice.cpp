@@ -61,6 +61,7 @@ extern SDH_INFO_T SD0, SD1;
 #define SD_BLOCK_DEVICE_ERROR_NO_DEVICE          -5005	/*!< device is missing or not connected */
 #define SD_BLOCK_DEVICE_ERROR_WRITE_PROTECTED    -5006	/*!< write protected */
 
+
 NuSDBlockDevice::NuSDBlockDevice() :
     _sectors(0),
     _is_initialized(false),
@@ -70,7 +71,9 @@ NuSDBlockDevice::NuSDBlockDevice() :
     _sdh_port((uint32_t) -1),
 #elif defined(TARGET_NUMAKER_PFM_M487)
     _sdh_base(NULL),
+    _sdh_irqn((IRQn_Type) -1),
 #endif
+    _sdh_irq_thunk(this, &NuSDBlockDevice::_sdh_irq),
     _sd_dat0(NU_SDH_DAT0),
     _sd_dat1(NU_SDH_DAT1),
     _sd_dat2(NU_SDH_DAT2),
@@ -88,10 +91,12 @@ NuSDBlockDevice::NuSDBlockDevice(PinName sd_dat0, PinName sd_dat1, PinName sd_da
     _dbg(false),
     _sdh((SDName) NC),
 #if defined(TARGET_NUMAKER_PFM_NUC472)
-    _sdh_port((uint32_t) -1)
+    _sdh_port((uint32_t) -1),
 #elif defined(TARGET_NUMAKER_PFM_M487)
-    _sdh_base(NULL)
+    _sdh_base(NULL),
+    _sdh_irqn((IRQn_Type) -1),
 #endif
+    _sdh_irq_thunk(this, &NuSDBlockDevice::_sdh_irq)
 {
     _sd_dat0 = sd_dat0;
     _sd_dat1 = sd_dat1;
@@ -135,6 +140,20 @@ int NuSDBlockDevice::init()
         }
     
 #elif defined(TARGET_NUMAKER_PFM_M487)
+        switch (NU_MODINDEX(_sdh)) {
+        case 0:
+            _sdh_irqn = SDH0_IRQn;
+            NVIC_SetVector(_sdh_irqn, _sdh_irq_thunk.entry());
+            NVIC_EnableIRQ(_sdh_irqn);
+            break;
+    
+        case 1:
+            _sdh_irqn = SDH1_IRQn;
+            NVIC_SetVector(_sdh_irqn, _sdh_irq_thunk.entry());
+            NVIC_EnableIRQ(_sdh_irqn);
+            break;
+        }
+        
         SDH_Open(_sdh_base, CardDetect_From_GPIO);
         SDH_Probe(_sdh_base);
     
@@ -165,7 +184,18 @@ int NuSDBlockDevice::init()
 
 int NuSDBlockDevice::deinit()
 {
+    _lock.lock();
+   
+#if defined(TARGET_NUMAKER_PFM_NUC472)
+    // TODO: Support IRQ
+#elif defined(TARGET_NUMAKER_PFM_M487)
+    // TODO
+#endif
+
     _is_initialized = false;
+    
+    _lock.unlock();
+    
     return BD_ERROR_OK;
 }
 
@@ -365,5 +395,51 @@ uint32_t NuSDBlockDevice::_sd_sectors()
     
     return _sectors;
 }
+
+void NuSDBlockDevice::_sdh_irq()
+{
+#if defined(TARGET_NUMAKER_PFM_NUC472)
+    // TODO: Support IRQ
+    
+#elif defined(TARGET_NUMAKER_PFM_M487)
+    // FMI data abort interrupt
+    if (_sdh_base->GINTSTS & SDH_GINTSTS_DTAIF_Msk) {
+        _sdh_base->GINTSTS = SDH_GINTSTS_DTAIF_Msk;
+        /* ResetAllEngine() */
+        _sdh_base->GCTL |= SDH_GCTL_GCTLRST_Msk;
+    }
+
+    //----- SD interrupt status
+    if (_sdh_base->INTSTS & SDH_INTSTS_BLKDIF_Msk) {
+        // block down
+        extern uint8_t volatile _SDH_SDDataReady;
+        _SDH_SDDataReady = TRUE;
+        _sdh_base->INTSTS = SDH_INTSTS_BLKDIF_Msk;
+    }
+    
+    // NOTE: On M487, there are two SDH instances which each support port 0 and don't support port 1.
+    //       Port 0 (support): INTEN.CDIEN0, INTEN.CDSRC0, INTSTS.CDIF0, INTSTS.CDSTS0
+    //       Port 1 (no support): INTEN.CDIEN1, INTEN.CDSRC1, INTSTS.CDIF1, INTSTS.CDSTS1
+    if (_sdh_base->INTSTS & SDH_INTSTS_CDIF0_Msk) { // port 0 card detect
+        _sdh_base->INTSTS = SDH_INTSTS_CDIF0_Msk;
+        // TBD: Support PnP
+    }
+
+    // CRC error interrupt
+    if (_sdh_base->INTSTS & SDH_INTSTS_CRCIF_Msk) {
+        _sdh_base->INTSTS = SDH_INTSTS_CRCIF_Msk;      // clear interrupt flag
+    }
+
+    if (_sdh_base->INTSTS & SDH_INTSTS_DITOIF_Msk) {
+        _sdh_base->INTSTS = SDH_INTSTS_DITOIF_Msk;
+    }
+
+    // Response in timeout interrupt
+    if (_sdh_base->INTSTS & SDH_INTSTS_RTOIF_Msk) {
+        _sdh_base->INTSTS |= SDH_INTSTS_RTOIF_Msk;
+    }
+#endif
+}
+
 
 #endif  //#if defined(TARGET_NUMAKER_PFM_NUC472) || defined(TARGET_NUMAKER_PFM_M487)
