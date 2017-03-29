@@ -19,6 +19,8 @@
 #include "BlockDevice.h"
 #include "mbed.h"
 
+struct nu_modinit_s;
+
 class NuSDBlockDevice : public BlockDevice {
 public:
     /** Lifetime of an SD card
@@ -112,13 +114,13 @@ private:
     bool _dbg;
     Mutex _lock;
     
+    const struct nu_modinit_s * _sdh_modinit;
     SDName      _sdh;
+    SDH_T *     _sdh_base;
 #if defined(TARGET_NUMAKER_PFM_NUC472)
     uint32_t    _sdh_port;
-#elif defined(TARGET_NUMAKER_PFM_M487)
-    SDH_T *             _sdh_base;
-    IRQn_Type           _sdh_irqn;
 #endif
+
     CThunk<NuSDBlockDevice>     _sdh_irq_thunk;
 
     PinName _sd_dat0;

@@ -20,6 +20,7 @@
 #include "NuSDBlockDevice.h"
 #include "PeripheralPins.h"
 #include "mbed_debug.h"
+#include "nu_modutil.h"
 
 #if defined(TARGET_NUMAKER_PFM_NUC472)
 #define NU_SDH_DAT0         PF_5
@@ -54,6 +55,20 @@ extern SDH_INFO_T SD0, SD1;
 #endif
 
 
+static const struct nu_modinit_s sdh_modinit_tab[] = {
+#if defined(TARGET_NUMAKER_PFM_NUC472)
+    {SD_0_0, SDH_MODULE, CLK_CLKSEL0_SDHSEL_PLL, CLK_CLKDIV0_SDH(2), SDH_RST, SD_IRQn, NULL},
+    {SD_0_1, SDH_MODULE, CLK_CLKSEL0_SDHSEL_PLL, CLK_CLKDIV0_SDH(2), SDH_RST, SD_IRQn, NULL},
+#elif defined(TARGET_NUMAKER_PFM_M487)
+    {SD_0, SDH0_MODULE, CLK_CLKSEL0_SDH0SEL_HCLK, CLK_CLKDIV0_SDH0(2), SDH0_RST, SDH0_IRQn, NULL},
+    {SD_1, SDH1_MODULE, CLK_CLKSEL0_SDH1SEL_HCLK, CLK_CLKDIV3_SDH1(2), SDH1_RST, SDH1_IRQn, NULL},
+#endif
+
+    {NC, 0, 0, 0, 0, (IRQn_Type) 0, NULL}
+};
+
+
+
 #define SD_BLOCK_DEVICE_ERROR_WOULD_BLOCK        -5001	/*!< operation would block */
 #define SD_BLOCK_DEVICE_ERROR_UNSUPPORTED        -5002	/*!< unsupported operation */
 #define SD_BLOCK_DEVICE_ERROR_PARAMETER          -5003	/*!< invalid parameter */
@@ -66,12 +81,11 @@ NuSDBlockDevice::NuSDBlockDevice() :
     _sectors(0),
     _is_initialized(false),
     _dbg(false),
+    _sdh_modinit(NULL),
     _sdh((SDName) NC),
+    _sdh_base(NULL),
 #if defined(TARGET_NUMAKER_PFM_NUC472)
     _sdh_port((uint32_t) -1),
-#elif defined(TARGET_NUMAKER_PFM_M487)
-    _sdh_base(NULL),
-    _sdh_irqn((IRQn_Type) -1),
 #endif
     _sdh_irq_thunk(this, &NuSDBlockDevice::_sdh_irq),
     _sd_dat0(NU_SDH_DAT0),
@@ -89,12 +103,11 @@ NuSDBlockDevice::NuSDBlockDevice(PinName sd_dat0, PinName sd_dat1, PinName sd_da
     _sectors(0),
     _is_initialized(false),
     _dbg(false),
+    _sdh_modinit(NULL),
     _sdh((SDName) NC),
+    _sdh_base(NULL),
 #if defined(TARGET_NUMAKER_PFM_NUC472)
     _sdh_port((uint32_t) -1),
-#elif defined(TARGET_NUMAKER_PFM_M487)
-    _sdh_base(NULL),
-    _sdh_irqn((IRQn_Type) -1),
 #endif
     _sdh_irq_thunk(this, &NuSDBlockDevice::_sdh_irq)
 {
@@ -140,20 +153,11 @@ int NuSDBlockDevice::init()
         }
     
 #elif defined(TARGET_NUMAKER_PFM_M487)
-        switch (NU_MODINDEX(_sdh)) {
-        case 0:
-            _sdh_irqn = SDH0_IRQn;
-            NVIC_SetVector(_sdh_irqn, _sdh_irq_thunk.entry());
-            NVIC_EnableIRQ(_sdh_irqn);
-            break;
-    
-        case 1:
-            _sdh_irqn = SDH1_IRQn;
-            NVIC_SetVector(_sdh_irqn, _sdh_irq_thunk.entry());
-            NVIC_EnableIRQ(_sdh_irqn);
-            break;
-        }
+        MBED_ASSERT(_sdh_modinit != NULL);
         
+        NVIC_SetVector(_sdh_modinit->irq_n, _sdh_irq_thunk.entry());
+        NVIC_EnableIRQ(_sdh_modinit->irq_n);
+
         SDH_Open(_sdh_base, CardDetect_From_GPIO);
         SDH_Probe(_sdh_base);
     
@@ -186,8 +190,12 @@ int NuSDBlockDevice::deinit()
 {
     _lock.lock();
    
+    if (_sdh_modinit) {
+        CLK_DisableModuleClock(_sdh_modinit->clkidx);
+    }
+    
 #if defined(TARGET_NUMAKER_PFM_NUC472)
-    // TODO: Support IRQ
+    // TODO
 #elif defined(TARGET_NUMAKER_PFM_M487)
     // TODO
 #endif
@@ -314,6 +322,11 @@ int NuSDBlockDevice::_init_sdh()
         return BD_ERROR_DEVICE_ERROR;
     }
     
+    _sdh_modinit = get_modinit(sd_mod, sdh_modinit_tab);
+    MBED_ASSERT(_sdh_modinit != NULL);
+    MBED_ASSERT(_sdh_modinit->modname == sd_mod);
+    
+    
     // Configure SD multi-function pins
     pinmap_pinout(_sd_dat0, PinMap_SD_DAT0);
     pinmap_pinout(_sd_dat1, PinMap_SD_DAT1);
@@ -328,6 +341,7 @@ int NuSDBlockDevice::_init_sdh()
     
     // Determine SDH port dependent on passed-in pins
     _sdh = (SDName) sd_mod;
+    _sdh_base = (SDH_T *) NU_MODBASE(_sdh);
 #if defined(TARGET_NUMAKER_PFM_NUC472)
     switch (NU_MODSUBINDEX(_sdh)) {
     case 0:
@@ -338,28 +352,12 @@ int NuSDBlockDevice::_init_sdh()
         _sdh_port = SD_PORT1;
         break;
     }
-    
-    // Enable IP clock
-    CLK->AHBCLK |= CLK_AHBCLK_SDHCKEN_Msk; // SD Card driving clock.
-    CLK_SetModuleClock(SDH_MODULE, CLK_CLKSEL0_SDHSEL_PLL, 1);
-    
-#elif defined(TARGET_NUMAKER_PFM_M487)
-    _sdh_base = (SDH_T *) NU_MODBASE(_sdh);
-    
-    switch (NU_MODINDEX(_sdh)) {
-    case 0:
-        CLK->CLKSEL0 = (CLK->CLKSEL0 & ~CLK_CLKSEL0_SDH0SEL_Msk) | CLK_CLKSEL0_SDH0SEL_HCLK;
-        CLK->AHBCLK |= CLK_AHBCLK_SDH0CKEN_Msk; // SD Card driving clock.
-        break;
-        
-    case 1:
-        CLK->CLKSEL0 = (CLK->CLKSEL0 & ~CLK_CLKSEL0_SDH1SEL_Msk) | CLK_CLKSEL0_SDH1SEL_HCLK;
-        CLK->AHBCLK |= CLK_AHBCLK_SDH1CKEN_Msk; // SD Card driving clock.
-        break;
-    }
-    
 #endif
 
+    SYS_ResetModule(_sdh_modinit->rsetidx);
+    CLK_SetModuleClock(_sdh_modinit->clkidx, _sdh_modinit->clksrc, _sdh_modinit->clkdiv);
+    CLK_EnableModuleClock(_sdh_modinit->clkidx);
+    
     SYS_LockReg();
 
     return BD_ERROR_OK;
