@@ -32,13 +32,13 @@
 #define NU_SDH_CDn          PF_6
 
 #elif defined(TARGET_NUMAKER_PFM_M487)
-#define NU_SDH_DAT0         PC_4
-#define NU_SDH_DAT1         PC_3
-#define NU_SDH_DAT2         PC_2
-#define NU_SDH_DAT3         PC_1
-#define NU_SDH_CMD          PE_12
-#define NU_SDH_CLK          PC_0
-#define NU_SDH_CDn          PE_13
+#define NU_SDH_DAT0         PE_2
+#define NU_SDH_DAT1         PE_3
+#define NU_SDH_DAT2         PE_4
+#define NU_SDH_DAT3         PE_5
+#define NU_SDH_CMD          PE_7
+#define NU_SDH_CLK          PE_6
+#define NU_SDH_CDn          PD_13
 
 #endif
 
@@ -418,8 +418,8 @@ void NuSDBlockDevice::_sdh_irq()
     // NOTE: On M487, there are two SDH instances which each support port 0 and don't support port 1.
     //       Port 0 (support): INTEN.CDIEN0, INTEN.CDSRC0, INTSTS.CDIF0, INTSTS.CDSTS0
     //       Port 1 (no support): INTEN.CDIEN1, INTEN.CDSRC1, INTSTS.CDIF1, INTSTS.CDSTS1
-    if (_sdh_base->INTSTS & SDH_INTSTS_CDIF0_Msk) { // port 0 card detect
-        _sdh_base->INTSTS = SDH_INTSTS_CDIF0_Msk;
+    if (_sdh_base->INTSTS & SDH_INTSTS_CDIF_Msk) { // port 0 card detect
+        _sdh_base->INTSTS = SDH_INTSTS_CDIF_Msk;
         // TBD: Support PnP
     }
 
