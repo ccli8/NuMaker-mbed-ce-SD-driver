@@ -34,8 +34,8 @@
 #elif defined(TARGET_NUMAKER_PFM_M487)
 #define NU_SDH_DAT0         PE_2
 #define NU_SDH_DAT1         PE_3
-#define NU_SDH_DAT2         PE_4
-#define NU_SDH_DAT3         PE_5
+#define NU_SDH_DAT2         PB_4
+#define NU_SDH_DAT3         PB_5
 #define NU_SDH_CMD          PE_7
 #define NU_SDH_CLK          PE_6
 #define NU_SDH_CDn          PD_13
