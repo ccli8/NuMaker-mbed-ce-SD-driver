@@ -15,7 +15,7 @@
  */
 
 /* Nuvoton mbed enabled targets which support SD card of SD bus mode */
-#if defined(TARGET_NUMAKER_PFM_NUC472) || defined(TARGET_NUMAKER_PFM_M487)
+#if defined(TARGET_NUMAKER_PFM_NUC472) || defined(TARGET_NUMAKER_PFM_M487) || defined(TARGET_NUMAKER_PFM_M2351)
 
 #include "NuSDBlockDevice.h"
 #include "PeripheralPins.h"
@@ -40,6 +40,15 @@
 #define NU_SDH_CLK          PE_6
 #define NU_SDH_CDn          PD_13
 
+#elif defined(TARGET_NUMAKER_PFM_M2351)
+#define NU_SDH_DAT0         PE_2
+#define NU_SDH_DAT1         PE_3
+#define NU_SDH_DAT2         PE_4
+#define NU_SDH_DAT3         PE_5
+#define NU_SDH_CMD          PE_7
+#define NU_SDH_CLK          PE_6
+#define NU_SDH_CDn          PD_13
+
 #endif
 
 #if defined(TARGET_NUMAKER_PFM_NUC472)
@@ -52,6 +61,10 @@ extern int sd0_ok,sd1_ok;
 extern int SDH_ok;
 extern SDH_INFO_T SD0, SD1;
 
+#elif defined(TARGET_NUMAKER_PFM_M2351)
+extern int SDH_ok;
+extern SDH_INFO_T SD0;
+
 #endif
 
 
@@ -62,6 +75,8 @@ static const struct nu_modinit_s sdh_modinit_tab[] = {
 #elif defined(TARGET_NUMAKER_PFM_M487)
     {SD_0, SDH0_MODULE, CLK_CLKSEL0_SDH0SEL_HCLK, CLK_CLKDIV0_SDH0(2), SDH0_RST, SDH0_IRQn, NULL},
     {SD_1, SDH1_MODULE, CLK_CLKSEL0_SDH1SEL_HCLK, CLK_CLKDIV3_SDH1(2), SDH1_RST, SDH1_IRQn, NULL},
+#elif defined(TARGET_NUMAKER_PFM_M2351)
+    {SD_0, SDH0_MODULE, CLK_CLKSEL0_SDH0SEL_HCLK, CLK_CLKDIV0_SDH0(2), SDH0_RST, SDH0_IRQn, NULL},
 #endif
 
     {NC, 0, 0, 0, 0, (IRQn_Type) 0, NULL}
@@ -170,6 +185,21 @@ int NuSDBlockDevice::init()
             _is_initialized = SDH_ok && (SD1.CardType != SDH_TYPE_UNKNOWN);
             break;
         }
+
+#elif defined(TARGET_NUMAKER_PFM_M2351)
+        MBED_ASSERT(_sdh_modinit != NULL);
+        
+        NVIC_SetVector(_sdh_modinit->irq_n, _sdh_irq_thunk.entry());
+        NVIC_EnableIRQ(_sdh_modinit->irq_n);
+
+        SDH_Open(_sdh_base, CardDetect_From_GPIO);
+        SDH_Probe(_sdh_base);
+    
+        switch (NU_MODINDEX(_sdh)) {
+        case 0:
+            _is_initialized = SDH_ok && (SD0.CardType != SDH_TYPE_UNKNOWN);
+            break;
+        }
 #endif
 
         if (!_is_initialized) {
@@ -191,12 +221,18 @@ int NuSDBlockDevice::deinit()
     _lock.lock();
    
     if (_sdh_modinit) {
+#if defined(__DOMAIN_NS) && __DOMAIN_NS
+        CLK_DisableModuleClock_S(_sdh_modinit->clkidx);
+#else
         CLK_DisableModuleClock(_sdh_modinit->clkidx);
+#endif
     }
     
 #if defined(TARGET_NUMAKER_PFM_NUC472)
     // TODO
 #elif defined(TARGET_NUMAKER_PFM_M487)
+    // TODO
+#elif defined(TARGET_NUMAKER_PFM_M2351)
     // TODO
 #endif
 
@@ -223,7 +259,7 @@ int NuSDBlockDevice::program(const void *b, bd_addr_t addr, bd_size_t size)
 
 #if defined(TARGET_NUMAKER_PFM_NUC472)
         if (SD_Write(_sdh_port, (uint8_t*)b, addr / 512, size / 512) != 0) {
-#elif defined(TARGET_NUMAKER_PFM_M487)
+#elif defined(TARGET_NUMAKER_PFM_M487) || defined(TARGET_NUMAKER_PFM_M2351)
         if (SDH_Write(_sdh_base, (uint8_t*)b, addr / 512, size / 512) != 0) {
 #endif
             err = BD_ERROR_DEVICE_ERROR;
@@ -252,7 +288,7 @@ int NuSDBlockDevice::read(void *b, bd_addr_t addr, bd_size_t size)
         
 #if defined(TARGET_NUMAKER_PFM_NUC472)
         if (SD_Read(_sdh_port, (uint8_t*)b, addr / 512, size / 512) != 0) {
-#elif defined(TARGET_NUMAKER_PFM_M487)
+#elif defined(TARGET_NUMAKER_PFM_M487) || defined(TARGET_NUMAKER_PFM_M2351)
         if (SDH_Read(_sdh_base, (uint8_t*)b, addr / 512, size / 512) != 0) {
 #endif
             err = BD_ERROR_DEVICE_ERROR;
@@ -337,7 +373,11 @@ int NuSDBlockDevice::_init_sdh()
     pinmap_pinout(_sd_cdn, PinMap_SD_CD);
     
     // Configure SD IP clock 
+#if defined(__DOMAIN_NS) && __DOMAIN_NS
+    SYS_UnlockReg_S();
+#else
     SYS_UnlockReg();
+#endif
     
     // Determine SDH port dependent on passed-in pins
     _sdh = (SDName) sd_mod;
@@ -354,11 +394,29 @@ int NuSDBlockDevice::_init_sdh()
     }
 #endif
 
+#if defined(__DOMAIN_NS) && __DOMAIN_NS
+    SYS_ResetModule_S(_sdh_modinit->rsetidx);
+#else
     SYS_ResetModule(_sdh_modinit->rsetidx);
+#endif
+
+#if defined(__DOMAIN_NS) && __DOMAIN_NS
+    CLK_SetModuleClock_S(_sdh_modinit->clkidx, _sdh_modinit->clksrc, _sdh_modinit->clkdiv);
+#else
     CLK_SetModuleClock(_sdh_modinit->clkidx, _sdh_modinit->clksrc, _sdh_modinit->clkdiv);
+#endif
+
+#if defined(__DOMAIN_NS) && __DOMAIN_NS
+    CLK_EnableModuleClock_S(_sdh_modinit->clkidx);
+#else
     CLK_EnableModuleClock(_sdh_modinit->clkidx);
-    
+#endif
+
+#if defined(__DOMAIN_NS) && __DOMAIN_NS
+    SYS_LockReg_S();
+#else
     SYS_LockReg();
+#endif
 
     return BD_ERROR_OK;
 }
@@ -387,6 +445,13 @@ uint32_t NuSDBlockDevice::_sd_sectors()
         break;
     }
     
+#elif defined(TARGET_NUMAKER_PFM_M2351)
+    switch (NU_MODINDEX(_sdh)) {
+    case 0:
+        _sectors = SD0.totalSectorN;
+        break;
+    }
+
 #endif
 
     _lock.unlock();
@@ -436,8 +501,44 @@ void NuSDBlockDevice::_sdh_irq()
     if (_sdh_base->INTSTS & SDH_INTSTS_RTOIF_Msk) {
         _sdh_base->INTSTS |= SDH_INTSTS_RTOIF_Msk;
     }
+    
+#elif defined(TARGET_NUMAKER_PFM_M2351)
+    // FMI data abort interrupt
+    if (_sdh_base->GINTSTS & SDH_GINTSTS_DTAIF_Msk) {
+        _sdh_base->GINTSTS = SDH_GINTSTS_DTAIF_Msk;
+        /* ResetAllEngine() */
+        _sdh_base->GCTL |= SDH_GCTL_GCTLRST_Msk;
+    }
+
+    //----- SD interrupt status
+    if (_sdh_base->INTSTS & SDH_INTSTS_BLKDIF_Msk) {
+        // block down
+        extern uint8_t volatile g_u8SDDataReadyFlag;
+        g_u8SDDataReadyFlag = TRUE;
+        _sdh_base->INTSTS = SDH_INTSTS_BLKDIF_Msk;
+    }
+    
+    if (_sdh_base->INTSTS & SDH_INTSTS_CDIF_Msk) {      // port 0 card detect
+        _sdh_base->INTSTS = SDH_INTSTS_CDIF_Msk;
+        // TBD: Support PnP
+    }
+
+    // CRC error interrupt
+    if (_sdh_base->INTSTS & SDH_INTSTS_CRCIF_Msk) {
+        _sdh_base->INTSTS = SDH_INTSTS_CRCIF_Msk;       // clear interrupt flag
+    }
+
+    if (_sdh_base->INTSTS & SDH_INTSTS_DITOIF_Msk) {
+        _sdh_base->INTSTS = SDH_INTSTS_DITOIF_Msk;
+    }
+
+    // Response in timeout interrupt
+    if (_sdh_base->INTSTS & SDH_INTSTS_RTOIF_Msk) {
+        _sdh_base->INTSTS |= SDH_INTSTS_RTOIF_Msk;
+    }
+
 #endif
 }
 
 
-#endif  //#if defined(TARGET_NUMAKER_PFM_NUC472) || defined(TARGET_NUMAKER_PFM_M487)
+#endif  // #if defined(TARGET_NUMAKER_PFM_NUC472) || defined(TARGET_NUMAKER_PFM_M487) || defined(TARGET_NUMAKER_PFM_M2351)
