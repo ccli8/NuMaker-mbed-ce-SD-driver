@@ -321,6 +321,11 @@ bd_size_t NuSDBlockDevice::get_erase_size() const
     return 512;
 }
 
+bd_size_t NuSDBlockDevice::get_erase_size(bd_addr_t addr) const
+{
+    return 512;
+}
+
 bd_size_t NuSDBlockDevice::size() const
 {
     return 512 * _sectors;
