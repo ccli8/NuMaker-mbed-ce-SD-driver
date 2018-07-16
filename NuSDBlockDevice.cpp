@@ -221,7 +221,7 @@ int NuSDBlockDevice::deinit()
     _lock.lock();
    
     if (_sdh_modinit) {
-#if defined(__DOMAIN_NS) && __DOMAIN_NS
+#if defined(DOMAIN_NS) && DOMAIN_NS
         CLK_DisableModuleClock_S(_sdh_modinit->clkidx);
 #else
         CLK_DisableModuleClock(_sdh_modinit->clkidx);
@@ -378,7 +378,7 @@ int NuSDBlockDevice::_init_sdh()
     pinmap_pinout(_sd_cdn, PinMap_SD_CD);
     
     // Configure SD IP clock 
-#if defined(__DOMAIN_NS) && __DOMAIN_NS
+#if defined(DOMAIN_NS) && DOMAIN_NS
     SYS_UnlockReg_S();
 #else
     SYS_UnlockReg();
@@ -399,25 +399,25 @@ int NuSDBlockDevice::_init_sdh()
     }
 #endif
 
-#if defined(__DOMAIN_NS) && __DOMAIN_NS
+#if defined(DOMAIN_NS) && DOMAIN_NS
     SYS_ResetModule_S(_sdh_modinit->rsetidx);
 #else
     SYS_ResetModule(_sdh_modinit->rsetidx);
 #endif
 
-#if defined(__DOMAIN_NS) && __DOMAIN_NS
+#if defined(DOMAIN_NS) && DOMAIN_NS
     CLK_SetModuleClock_S(_sdh_modinit->clkidx, _sdh_modinit->clksrc, _sdh_modinit->clkdiv);
 #else
     CLK_SetModuleClock(_sdh_modinit->clkidx, _sdh_modinit->clksrc, _sdh_modinit->clkdiv);
 #endif
 
-#if defined(__DOMAIN_NS) && __DOMAIN_NS
+#if defined(DOMAIN_NS) && DOMAIN_NS
     CLK_EnableModuleClock_S(_sdh_modinit->clkidx);
 #else
     CLK_EnableModuleClock(_sdh_modinit->clkidx);
 #endif
 
-#if defined(__DOMAIN_NS) && __DOMAIN_NS
+#if defined(DOMAIN_NS) && DOMAIN_NS
     SYS_LockReg_S();
 #else
     SYS_LockReg();
