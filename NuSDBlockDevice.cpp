@@ -21,6 +21,7 @@
 #include "PeripheralPins.h"
 #include "mbed_debug.h"
 #include "nu_modutil.h"
+#include "mbed_critical.h"
 
 #if defined(TARGET_NUMAKER_PFM_NUC472)
 #define NU_SDH_DAT0         PF_5
@@ -94,7 +95,6 @@ static const struct nu_modinit_s sdh_modinit_tab[] = {
 
 NuSDBlockDevice::NuSDBlockDevice() :
     _sectors(0),
-    _is_initialized(false),
     _dbg(false),
     _sdh_modinit(NULL),
     _sdh((SDName) NC),
@@ -109,14 +109,15 @@ NuSDBlockDevice::NuSDBlockDevice() :
     _sd_dat3(NU_SDH_DAT3),
     _sd_cmd(NU_SDH_CMD),
     _sd_clk(NU_SDH_CLK),
-    _sd_cdn(NU_SDH_CDn)
+    _sd_cdn(NU_SDH_CDn),
+    _is_initialized(false),
+    _init_ref_count(0)
 {
 }
 
 NuSDBlockDevice::NuSDBlockDevice(PinName sd_dat0, PinName sd_dat1, PinName sd_dat2, PinName sd_dat3,
     PinName sd_cmd, PinName sd_clk, PinName sd_cdn) :
     _sectors(0),
-    _is_initialized(false),
     _dbg(false),
     _sdh_modinit(NULL),
     _sdh((SDName) NC),
@@ -124,7 +125,9 @@ NuSDBlockDevice::NuSDBlockDevice(PinName sd_dat0, PinName sd_dat1, PinName sd_da
 #if defined(TARGET_NUMAKER_PFM_NUC472)
     _sdh_port((uint32_t) -1),
 #endif
-    _sdh_irq_thunk(this, &NuSDBlockDevice::_sdh_irq)
+    _sdh_irq_thunk(this, &NuSDBlockDevice::_sdh_irq),
+    _is_initialized(false),
+    _init_ref_count(0)
 {
     _sd_dat0 = sd_dat0;
     _sd_dat1 = sd_dat1;
@@ -148,6 +151,13 @@ int NuSDBlockDevice::init()
     int err = BD_ERROR_OK;
     
     do {
+        if (_is_initialized) {
+            _init_ref_count ++;
+            break;
+        } else {
+            _init_ref_count = 0;
+        }
+    
         err = _init_sdh();
         if (err != BD_ERROR_OK) {
             break;
@@ -202,7 +212,9 @@ int NuSDBlockDevice::init()
         }
 #endif
 
-        if (!_is_initialized) {
+        if (_is_initialized) {
+            _init_ref_count = 1;
+        } else {
             debug_if(_dbg, "Fail to initialize card\n");
             err = BD_ERROR_DEVICE_ERROR;
         }
@@ -219,28 +231,40 @@ int NuSDBlockDevice::init()
 int NuSDBlockDevice::deinit()
 {
     _lock.lock();
-   
-    if (_sdh_modinit) {
+    int err = BD_ERROR_OK;
+
+    do {
+        if (_is_initialized && _init_ref_count > 1) {
+            _init_ref_count --;
+            break;
+        } else if (! _is_initialized) {
+            _init_ref_count = 0;
+            break;
+        }
+
+        if (_sdh_modinit) {
 #if defined(DOMAIN_NS) && DOMAIN_NS
-        CLK_DisableModuleClock_S(_sdh_modinit->clkidx);
+            CLK_DisableModuleClock_S(_sdh_modinit->clkidx);
 #else
-        CLK_DisableModuleClock(_sdh_modinit->clkidx);
+            CLK_DisableModuleClock(_sdh_modinit->clkidx);
 #endif
-    }
+        }
     
 #if defined(TARGET_NUMAKER_PFM_NUC472)
-    // TODO
+        // TODO
 #elif defined(TARGET_NUMAKER_PFM_M487)
-    // TODO
+        // TODO
 #elif defined(TARGET_NUMAKER_PFM_M2351)
-    // TODO
+        // TODO
 #endif
 
-    _is_initialized = false;
-    
+        _is_initialized = false;
+        _init_ref_count = 0;
+    } while (0);
+
     _lock.unlock();
     
-    return BD_ERROR_OK;
+    return err;
 }
 
 int NuSDBlockDevice::program(const void *b, bd_addr_t addr, bd_size_t size)
@@ -255,6 +279,7 @@ int NuSDBlockDevice::program(const void *b, bd_addr_t addr, bd_size_t size)
     do {
         if (! _is_initialized) {
             err = SD_BLOCK_DEVICE_ERROR_NO_INIT;
+            break;
         }
 
 #if defined(TARGET_NUMAKER_PFM_NUC472)
@@ -284,6 +309,7 @@ int NuSDBlockDevice::read(void *b, bd_addr_t addr, bd_size_t size)
     do {
         if (! _is_initialized) {
             err = SD_BLOCK_DEVICE_ERROR_NO_INIT;
+            break;
         }
         
 #if defined(TARGET_NUMAKER_PFM_NUC472)
@@ -303,6 +329,10 @@ int NuSDBlockDevice::read(void *b, bd_addr_t addr, bd_size_t size)
 
 int NuSDBlockDevice::erase(bd_addr_t addr, bd_size_t size)
 {
+    if (! _is_initialized) {
+        return SD_BLOCK_DEVICE_ERROR_NO_INIT;
+    }
+
     return BD_ERROR_OK;
 }
 
@@ -328,6 +358,10 @@ bd_size_t NuSDBlockDevice::get_erase_size(bd_addr_t addr) const
 
 bd_size_t NuSDBlockDevice::size() const
 {
+    if (! _is_initialized) {
+        return SD_BLOCK_DEVICE_ERROR_NO_INIT;
+    }
+
     return 512 * _sectors;
 }
 

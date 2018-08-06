@@ -118,7 +118,6 @@ private:
     void _sdh_irq();
 
     uint32_t _sectors;
-    bool _is_initialized;
     bool _dbg;
     Mutex _lock;
     
@@ -138,6 +137,9 @@ private:
     PinName _sd_cmd;
     PinName _sd_clk;
     PinName _sd_cdn;
+
+    bool                        _is_initialized;
+    uint32_t                    _init_ref_count;
 };
 
 #endif  /* __NU_SD_BLOCK_DEVICE_H__ */
