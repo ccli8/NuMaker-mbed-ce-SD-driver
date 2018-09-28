@@ -16,6 +16,8 @@
 #ifndef __NU_SD_BLOCK_DEVICE_H__
 #define __NU_SD_BLOCK_DEVICE_H__
 
+#if TARGET_NUVOTON
+
 #include "BlockDevice.h"
 #include "mbed.h"
 
@@ -124,7 +126,7 @@ private:
     const struct nu_modinit_s * _sdh_modinit;
     SDName      _sdh;
     SDH_T *     _sdh_base;
-#if defined(TARGET_NUMAKER_PFM_NUC472)
+#if TARGET_NUMAKER_PFM_NUC472
     uint32_t    _sdh_port;
 #endif
 
@@ -142,4 +144,5 @@ private:
     uint32_t                    _init_ref_count;
 };
 
+#endif  /* TARGET_NUVOTON */
 #endif  /* __NU_SD_BLOCK_DEVICE_H__ */
