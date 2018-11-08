@@ -14,4 +14,5 @@ is modified to use this SD block device to back the FAT file system.
 ## Support Nuvoton platforms
 - [NuMaker-PFM-NUC472](https://developer.mbed.org/platforms/Nuvoton-NUC472/)
 - NuMaker-PFM-M487
+- NuMaker-PFM-M2351
 
