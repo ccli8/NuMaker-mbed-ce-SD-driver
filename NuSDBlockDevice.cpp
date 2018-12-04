@@ -22,6 +22,24 @@
 #include "mbed_debug.h"
 #include "nu_modutil.h"
 #include "mbed_critical.h"
+#include "mbed_toolchain.h"
+
+/* SD DMA compatible buffer if user buffer doesn't meet requirements
+ * 
+ * SD DMA buffer location requires to be:
+ * (1) Word-aligned
+ * (2) Located in 0x2xxxxxxx/0x3xxxxxxx region. Check linker files to ensure global/static
+ *     variables are placed in this region.
+ *
+ * SD DMA buffer size DMA_BUF_SIZE must be a multiple of 512-byte block size.
+ * Its value is estimated to trade memory footprint off against performance.
+ *
+ */
+#define DMA_BUFF_SIZE       512
+MBED_ALIGN(4) static uint8_t dma_buff[DMA_BUFF_SIZE];
+
+/* Check if specified buffer is SD DMA-compatible */
+static bool sd_dma_buff_compat(const void *buff, size_t buff_size, size_t size_aligned_to);
 
 #if TARGET_NUMAKER_PFM_NUC472
 #define NU_SDH_DAT0         PF_5
@@ -282,14 +300,40 @@ int NuSDBlockDevice::program(const void *b, bd_addr_t addr, bd_size_t size)
             break;
         }
 
+        /* Check if user buffer is SD DMA-compatible */
+        if (sd_dma_buff_compat(b, static_cast<size_t>(size), 512)) {
+            /* User buffer is DMA-compatible. We can transfer directly. */
 #if TARGET_NUMAKER_PFM_NUC472
-        if (SD_Write(_sdh_port, (uint8_t*)b, addr / 512, size / 512) != 0) {
+            if (SD_Write(_sdh_port, (uint8_t*)b, addr / 512, size / 512) != 0) {
 #elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351
-        if (SDH_Write(_sdh_base, (uint8_t*)b, addr / 512, size / 512) != 0) {
+            if (SDH_Write(_sdh_base, (uint8_t*)b, addr / 512, size / 512) != 0) {
 #endif
-            err = BD_ERROR_DEVICE_ERROR;
+                err = BD_ERROR_DEVICE_ERROR;
+            }
+        } else {
+            /* User buffer is not SD DMA-compatible. We must transfer via DMA intermediate buffer. */
+            const uint8_t *b_pos = static_cast<const uint8_t *>(b);
+            bd_addr_t addr_pos = addr;
+            bd_size_t rmn = size;
+
+            while (rmn) {
+                size_t todo_size = (rmn >= DMA_BUFF_SIZE) ? DMA_BUFF_SIZE : static_cast<size_t>(rmn);
+                memcpy(dma_buff, b_pos, todo_size);
+
+#if TARGET_NUMAKER_PFM_NUC472
+                if (SD_Write(_sdh_port, const_cast<uint8_t*>(dma_buff), static_cast<uint32_t>(addr_pos / 512), static_cast<uint32_t>(todo_size / 512)) != 0) {
+#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351
+                if (SDH_Write(_sdh_base, const_cast<uint8_t*>(dma_buff), static_cast<uint32_t>(addr_pos / 512), static_cast<uint32_t>(todo_size / 512)) != 0) {
+#endif
+                    err = BD_ERROR_DEVICE_ERROR;
+                    break;
+                }
+            
+                b_pos += todo_size;
+                addr_pos += todo_size;
+                rmn -= todo_size;
+            }
         }
-        
     } while (0);
     
     _lock.unlock();
@@ -311,15 +355,42 @@ int NuSDBlockDevice::read(void *b, bd_addr_t addr, bd_size_t size)
             err = SD_BLOCK_DEVICE_ERROR_NO_INIT;
             break;
         }
-        
+
+        /* Check if user buffer is SD DMA-compatible */
+        if (sd_dma_buff_compat(b, static_cast<size_t>(size), 512)) {
+            /* User buffer is SD DMA-compatible. We can transfer directly. */
 #if TARGET_NUMAKER_PFM_NUC472
-        if (SD_Read(_sdh_port, (uint8_t*)b, addr / 512, size / 512) != 0) {
+            if (SD_Read(_sdh_port, (uint8_t*)b, addr / 512, size / 512) != 0) {
 #elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351
-        if (SDH_Read(_sdh_base, (uint8_t*)b, addr / 512, size / 512) != 0) {
+            if (SDH_Read(_sdh_base, (uint8_t*)b, addr / 512, size / 512) != 0) {
 #endif
-            err = BD_ERROR_DEVICE_ERROR;
+                err = BD_ERROR_DEVICE_ERROR;
+            }
+        } else {
+            /* User buffer is not SD DMA-compatible. We must transfer via DMA intermediate buffer. */
+            uint8_t *b_pos = static_cast<uint8_t *>(b);
+            bd_addr_t addr_pos = addr;
+            bd_size_t rmn = size;
+            
+            while (rmn) {
+                size_t todo_size = (rmn >= DMA_BUFF_SIZE) ? DMA_BUFF_SIZE : static_cast<size_t>(rmn);
+
+#if TARGET_NUMAKER_PFM_NUC472
+                if (SD_Read(_sdh_port, static_cast<uint8_t*>(dma_buff), static_cast<uint32_t>(addr_pos / 512), static_cast<uint32_t>(todo_size / 512)) != 0) {
+#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351
+                if (SDH_Read(_sdh_base, static_cast<uint8_t*>(dma_buff), static_cast<uint32_t>(addr_pos / 512), static_cast<uint32_t>(todo_size / 512)) != 0) {
+#endif
+                    err = BD_ERROR_DEVICE_ERROR;
+                    break;
+                }
+
+                memcpy(b_pos, dma_buff, todo_size);
+
+                b_pos += todo_size;
+                addr_pos += todo_size;
+                rmn -= todo_size;
+            }
         }
-        
     } while (0);
     
     _lock.unlock();
@@ -579,5 +650,17 @@ void NuSDBlockDevice::_sdh_irq()
 #endif
 }
 
+static bool sd_dma_buff_compat(const void *buff, size_t buff_size, size_t size_aligned_to)
+{
+    uint32_t buff_ = (uint32_t) buff;
+
+    return (((buff_ & 0x03) == 0) &&                                        // Word-aligned buffer base address
+        ((buff_size & (size_aligned_to - 1)) == 0) &&                       // 'size_aligned_to'-aligned buffer size
+#if TARGET_NUMAKER_PFM_M2351 && (defined(DOMAIN_NS) && DOMAIN_NS)
+        (((buff_ >> 28) == 0x3) && (buff_size <= (0x40000000 - buff_))));   // 0x30000000-0x3FFFFFFF
+#else        
+        (((buff_ >> 28) == 0x2) && (buff_size <= (0x30000000 - buff_))));   // 0x20000000-0x2FFFFFFF
+#endif
+}
 
 #endif  /* TARGET_NUVOTON */
