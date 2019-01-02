@@ -19,6 +19,7 @@
 #if TARGET_NUVOTON
 
 #include "BlockDevice.h"
+#include "platform/PlatformMutex.h"
 #include "mbed.h"
 
 struct nu_modinit_s;
@@ -121,7 +122,7 @@ private:
 
     uint32_t _sectors;
     bool _dbg;
-    Mutex _lock;
+    PlatformMutex _lock;
     
     const struct nu_modinit_s * _sdh_modinit;
     SDName      _sdh;
