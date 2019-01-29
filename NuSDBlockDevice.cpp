@@ -663,4 +663,9 @@ static bool sd_dma_buff_compat(const void *buff, size_t buff_size, size_t size_a
 #endif
 }
 
+const char *NuSDBlockDevice::get_type() const
+{
+    return "NUSD";
+}
+
 #endif  /* TARGET_NUVOTON */
