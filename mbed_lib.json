@@ -1,0 +1,13 @@
+{
+    "name": "nusd",
+    "config": {
+        "provide-default-blockdevice": {
+            "help": "Provide default block device. [true/false]",
+            "value": false
+        },
+        "provide-kvstore-other-blockdevice": {
+            "help": "Provide kvstore other block device for outside mbed-os tree. [true/false]",
+            "value": false
+        }
+    }
+}
