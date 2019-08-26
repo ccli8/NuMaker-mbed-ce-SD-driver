@@ -59,7 +59,7 @@ static bool sd_dma_buff_compat(const void *buff, size_t buff_size, size_t size_a
 #define NU_SDH_CLK          PE_6
 #define NU_SDH_CDn          PD_13
 
-#elif TARGET_NUMAKER_PFM_M2351 || TARGET_NUMAKER_IOT_M263A
+#elif TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A
 #define NU_SDH_DAT0         PE_2
 #define NU_SDH_DAT1         PE_3
 #define NU_SDH_DAT2         PE_4
@@ -80,7 +80,7 @@ extern int sd0_ok,sd1_ok;
 extern int SDH_ok;
 extern SDH_INFO_T SD0, SD1;
 
-#elif TARGET_NUMAKER_PFM_M2351 || TARGET_NUMAKER_IOT_M263A
+#elif TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A
 extern int SDH_ok;
 extern SDH_INFO_T SD0;
 
@@ -94,7 +94,7 @@ static const struct nu_modinit_s sdh_modinit_tab[] = {
 #elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487
     {SD_0, SDH0_MODULE, CLK_CLKSEL0_SDH0SEL_HCLK, CLK_CLKDIV0_SDH0(2), SDH0_RST, SDH0_IRQn, NULL},
     {SD_1, SDH1_MODULE, CLK_CLKSEL0_SDH1SEL_HCLK, CLK_CLKDIV3_SDH1(2), SDH1_RST, SDH1_IRQn, NULL},
-#elif TARGET_NUMAKER_PFM_M2351 || TARGET_NUMAKER_IOT_M263A
+#elif TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A
     {SD_0, SDH0_MODULE, CLK_CLKSEL0_SDH0SEL_HCLK, CLK_CLKDIV0_SDH0(2), SDH0_RST, SDH0_IRQn, NULL},
 #endif
 
@@ -214,7 +214,7 @@ int NuSDBlockDevice::init()
             break;
         }
 
-#elif TARGET_NUMAKER_PFM_M2351 || TARGET_NUMAKER_IOT_M263A
+#elif TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A
         MBED_ASSERT(_sdh_modinit != NULL);
         
         NVIC_SetVector(_sdh_modinit->irq_n, _sdh_irq_thunk.entry());
@@ -272,7 +272,7 @@ int NuSDBlockDevice::deinit()
         // TODO
 #elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487
         // TODO
-#elif TARGET_NUMAKER_PFM_M2351 || TARGET_NUMAKER_IOT_M263A
+#elif TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A
         // TODO
 #endif
 
@@ -305,7 +305,7 @@ int NuSDBlockDevice::program(const void *b, bd_addr_t addr, bd_size_t size)
             /* User buffer is DMA-compatible. We can transfer directly. */
 #if TARGET_NUMAKER_PFM_NUC472
             if (SD_Write(_sdh_port, (uint8_t*)b, addr / 512, size / 512) != 0) {
-#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351 || TARGET_NUMAKER_IOT_M263A
+#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A
             if (SDH_Write(_sdh_base, (uint8_t*)b, addr / 512, size / 512) != 0) {
 #endif
                 err = BD_ERROR_DEVICE_ERROR;
@@ -322,7 +322,7 @@ int NuSDBlockDevice::program(const void *b, bd_addr_t addr, bd_size_t size)
 
 #if TARGET_NUMAKER_PFM_NUC472
                 if (SD_Write(_sdh_port, const_cast<uint8_t*>(dma_buff), static_cast<uint32_t>(addr_pos / 512), static_cast<uint32_t>(todo_size / 512)) != 0) {
-#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351 || TARGET_NUMAKER_IOT_M263A
+#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A
                 if (SDH_Write(_sdh_base, const_cast<uint8_t*>(dma_buff), static_cast<uint32_t>(addr_pos / 512), static_cast<uint32_t>(todo_size / 512)) != 0) {
 #endif
                     err = BD_ERROR_DEVICE_ERROR;
@@ -361,7 +361,7 @@ int NuSDBlockDevice::read(void *b, bd_addr_t addr, bd_size_t size)
             /* User buffer is SD DMA-compatible. We can transfer directly. */
 #if TARGET_NUMAKER_PFM_NUC472
             if (SD_Read(_sdh_port, (uint8_t*)b, addr / 512, size / 512) != 0) {
-#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351 || TARGET_NUMAKER_IOT_M263A
+#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A
             if (SDH_Read(_sdh_base, (uint8_t*)b, addr / 512, size / 512) != 0) {
 #endif
                 err = BD_ERROR_DEVICE_ERROR;
@@ -377,7 +377,7 @@ int NuSDBlockDevice::read(void *b, bd_addr_t addr, bd_size_t size)
 
 #if TARGET_NUMAKER_PFM_NUC472
                 if (SD_Read(_sdh_port, static_cast<uint8_t*>(dma_buff), static_cast<uint32_t>(addr_pos / 512), static_cast<uint32_t>(todo_size / 512)) != 0) {
-#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351 || TARGET_NUMAKER_IOT_M263A
+#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A
                 if (SDH_Read(_sdh_base, static_cast<uint8_t*>(dma_buff), static_cast<uint32_t>(addr_pos / 512), static_cast<uint32_t>(todo_size / 512)) != 0) {
 #endif
                     err = BD_ERROR_DEVICE_ERROR;
@@ -555,7 +555,7 @@ uint32_t NuSDBlockDevice::_sd_sectors()
         break;
     }
     
-#elif TARGET_NUMAKER_PFM_M2351 || TARGET_NUMAKER_IOT_M263A
+#elif TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A
     switch (NU_MODINDEX(_sdh)) {
     case 0:
         _sectors = SD0.totalSectorN;
@@ -612,7 +612,7 @@ void NuSDBlockDevice::_sdh_irq()
         _sdh_base->INTSTS |= SDH_INTSTS_RTOIF_Msk;
     }
     
-#elif TARGET_NUMAKER_PFM_M2351 || TARGET_NUMAKER_IOT_M263A
+#elif TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A
     // FMI data abort interrupt
     if (_sdh_base->GINTSTS & SDH_GINTSTS_DTAIF_Msk) {
         _sdh_base->GINTSTS = SDH_GINTSTS_DTAIF_Msk;
@@ -656,7 +656,7 @@ static bool sd_dma_buff_compat(const void *buff, size_t buff_size, size_t size_a
 
     return (((buff_ & 0x03) == 0) &&                                        // Word-aligned buffer base address
         ((buff_size & (size_aligned_to - 1)) == 0) &&                       // 'size_aligned_to'-aligned buffer size
-#if TARGET_NUMAKER_PFM_M2351 && (defined(DOMAIN_NS) && DOMAIN_NS)
+#if (TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351_CM) && (defined(DOMAIN_NS) && DOMAIN_NS)
         (((buff_ >> 28) == 0x3) && (buff_size <= (0x40000000 - buff_))));   // 0x30000000-0x3FFFFFFF
 #else        
         (((buff_ >> 28) == 0x2) && (buff_size <= (0x30000000 - buff_))));   // 0x20000000-0x2FFFFFFF
