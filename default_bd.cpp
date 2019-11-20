@@ -32,8 +32,12 @@ BlockDevice *BlockDevice::get_default_instance()
 #if defined(MBED_CONF_NUSD_PROVIDE_KVSTORE_OTHER_BLOCKDEVICE) && MBED_CONF_NUSD_PROVIDE_KVSTORE_OTHER_BLOCKDEVICE
 BlockDevice *get_other_blockdevice()
 {
+#if defined(MBED_CONF_NUSD_PROVIDE_DEFAULT_BLOCKDEVICE) && MBED_CONF_NUSD_PROVIDE_DEFAULT_BLOCKDEVICE
+    return BlockDevice::get_default_instance();
+#else
     static NuSDBlockDevice default_bd;
 
     return &default_bd;
+#endif
 }
 #endif
