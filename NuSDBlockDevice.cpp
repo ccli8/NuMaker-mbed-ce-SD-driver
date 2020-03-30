@@ -583,8 +583,13 @@ void NuSDBlockDevice::_sdh_irq()
     //----- SD interrupt status
     if (_sdh_base->INTSTS & SDH_INTSTS_BLKDIF_Msk) {
         // block down
+#if MBED_MAJOR_VERSION >= 6
+        extern uint8_t volatile g_u8SDDataReadyFlag;
+        g_u8SDDataReadyFlag = TRUE;
+#else
         extern uint8_t volatile _SDH_SDDataReady;
         _SDH_SDDataReady = TRUE;
+#endif
         _sdh_base->INTSTS = SDH_INTSTS_BLKDIF_Msk;
     }
     
