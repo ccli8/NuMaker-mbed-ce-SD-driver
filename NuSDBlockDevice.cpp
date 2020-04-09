@@ -77,11 +77,9 @@ extern SD_INFO_T SD0,SD1;
 extern int sd0_ok,sd1_ok;
 
 #elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487
-extern int SDH_ok;
 extern SDH_INFO_T SD0, SD1;
 
 #elif TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A
-extern int SDH_ok;
 extern SDH_INFO_T SD0;
 
 #endif
@@ -202,8 +200,8 @@ int NuSDBlockDevice::init()
         NVIC_EnableIRQ(_sdh_modinit->irq_n);
 
         SDH_Open(_sdh_base, CardDetect_From_GPIO);
-        SDH_Probe(_sdh_base);
-    
+        bool SDH_ok = SDH_Probe(_sdh_base) == 0 ? true : false;
+
         switch (NU_MODINDEX(_sdh)) {
         case 0:
             _is_initialized = SDH_ok && (SD0.CardType != SDH_TYPE_UNKNOWN);
@@ -221,7 +219,7 @@ int NuSDBlockDevice::init()
         NVIC_EnableIRQ(_sdh_modinit->irq_n);
 
         SDH_Open(_sdh_base, CardDetect_From_GPIO);
-        SDH_Probe(_sdh_base);
+        bool SDH_ok = SDH_Probe(_sdh_base) == 0 ? true : false;
     
         switch (NU_MODINDEX(_sdh)) {
         case 0:
