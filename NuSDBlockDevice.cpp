@@ -50,6 +50,15 @@ static bool sd_dma_buff_compat(const void *buff, size_t buff_size, size_t size_a
 #define NU_SDH_CLK          PF_8
 #define NU_SDH_CDn          PF_6
 
+#elif TARGET_NUMAKER_IOT_M467
+#define NU_SDH_DAT0         PE_2
+#define NU_SDH_DAT1         PE_3
+#define NU_SDH_DAT2         PE_4
+#define NU_SDH_DAT3         PE_5
+#define NU_SDH_CMD          PE_7
+#define NU_SDH_CLK          PE_6
+#define NU_SDH_CDn          PD_13
+
 #elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487
 #define NU_SDH_DAT0         PE_2
 #define NU_SDH_DAT1         PE_3
@@ -85,7 +94,7 @@ extern DISK_DATA_T SD_DiskInfo1;
 extern SD_INFO_T SD0,SD1;
 extern int sd0_ok,sd1_ok;
 
-#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487
+#elif TARGET_NUMAKER_IOT_M467 || TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487
 extern SDH_INFO_T SD0, SD1;
 
 #elif TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A || TARGET_NU_M2354
@@ -98,7 +107,7 @@ static const struct nu_modinit_s sdh_modinit_tab[] = {
 #if TARGET_NUMAKER_PFM_NUC472
     {SD_0_0, SDH_MODULE, CLK_CLKSEL0_SDHSEL_PLL, CLK_CLKDIV0_SDH(2), SDH_RST, SD_IRQn, NULL},
     {SD_0_1, SDH_MODULE, CLK_CLKSEL0_SDHSEL_PLL, CLK_CLKDIV0_SDH(2), SDH_RST, SD_IRQn, NULL},
-#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487
+#elif TARGET_NUMAKER_IOT_M467 || TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487
     {SD_0, SDH0_MODULE, CLK_CLKSEL0_SDH0SEL_HCLK, CLK_CLKDIV0_SDH0(2), SDH0_RST, SDH0_IRQn, NULL},
     {SD_1, SDH1_MODULE, CLK_CLKSEL0_SDH1SEL_HCLK, CLK_CLKDIV3_SDH1(2), SDH1_RST, SDH1_IRQn, NULL},
 #elif TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A || TARGET_NU_M2354
@@ -202,7 +211,7 @@ int NuSDBlockDevice::init()
             break;
         }
     
-#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487
+#elif TARGET_NUMAKER_IOT_M467 || TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487
         MBED_ASSERT(_sdh_modinit != NULL);
         
         NVIC_SetVector(_sdh_modinit->irq_n, _sdh_irq_thunk.entry());
@@ -277,7 +286,7 @@ int NuSDBlockDevice::deinit()
     
 #if TARGET_NUMAKER_PFM_NUC472
         // TODO
-#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487
+#elif TARGET_NUMAKER_IOT_M467 || TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487
         // TODO
 #elif TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A || TARGET_NU_M2354
         // TODO
@@ -312,7 +321,7 @@ int NuSDBlockDevice::program(const void *b, bd_addr_t addr, bd_size_t size)
             /* User buffer is DMA-compatible. We can transfer directly. */
 #if TARGET_NUMAKER_PFM_NUC472
             if (SD_Write(_sdh_port, (uint8_t*)b, addr / 512, size / 512) != 0) {
-#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A || TARGET_NU_M2354
+#elif TARGET_NUMAKER_IOT_M467 || TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A || TARGET_NU_M2354
             if (SDH_Write(_sdh_base, (uint8_t*)b, addr / 512, size / 512) != 0) {
 #endif
                 err = BD_ERROR_DEVICE_ERROR;
@@ -329,7 +338,7 @@ int NuSDBlockDevice::program(const void *b, bd_addr_t addr, bd_size_t size)
 
 #if TARGET_NUMAKER_PFM_NUC472
                 if (SD_Write(_sdh_port, const_cast<uint8_t*>(dma_buff), static_cast<uint32_t>(addr_pos / 512), static_cast<uint32_t>(todo_size / 512)) != 0) {
-#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A || TARGET_NU_M2354
+#elif TARGET_NUMAKER_IOT_M467 || TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A || TARGET_NU_M2354
                 if (SDH_Write(_sdh_base, const_cast<uint8_t*>(dma_buff), static_cast<uint32_t>(addr_pos / 512), static_cast<uint32_t>(todo_size / 512)) != 0) {
 #endif
                     err = BD_ERROR_DEVICE_ERROR;
@@ -368,7 +377,7 @@ int NuSDBlockDevice::read(void *b, bd_addr_t addr, bd_size_t size)
             /* User buffer is SD DMA-compatible. We can transfer directly. */
 #if TARGET_NUMAKER_PFM_NUC472
             if (SD_Read(_sdh_port, (uint8_t*)b, addr / 512, size / 512) != 0) {
-#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A || TARGET_NU_M2354
+#elif TARGET_NUMAKER_IOT_M467 || TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A || TARGET_NU_M2354
             if (SDH_Read(_sdh_base, (uint8_t*)b, addr / 512, size / 512) != 0) {
 #endif
                 err = BD_ERROR_DEVICE_ERROR;
@@ -384,7 +393,7 @@ int NuSDBlockDevice::read(void *b, bd_addr_t addr, bd_size_t size)
 
 #if TARGET_NUMAKER_PFM_NUC472
                 if (SD_Read(_sdh_port, static_cast<uint8_t*>(dma_buff), static_cast<uint32_t>(addr_pos / 512), static_cast<uint32_t>(todo_size / 512)) != 0) {
-#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A || TARGET_NU_M2354
+#elif TARGET_NUMAKER_IOT_M467 || TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487 || TARGET_NUMAKER_PFM_M2351 || TARGET_NU_PFM_M2351 || TARGET_NU_PFM_M2351_CM || TARGET_NUMAKER_IOT_M263A || TARGET_NU_M2354
                 if (SDH_Read(_sdh_base, static_cast<uint8_t*>(dma_buff), static_cast<uint32_t>(addr_pos / 512), static_cast<uint32_t>(todo_size / 512)) != 0) {
 #endif
                     err = BD_ERROR_DEVICE_ERROR;
@@ -552,7 +561,7 @@ uint32_t NuSDBlockDevice::_sd_sectors()
         break;
     }
     
-#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487
+#elif TARGET_NUMAKER_IOT_M467 || TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487
     switch (NU_MODINDEX(_sdh)) {
     case 0:
         _sectors = SD0.totalSectorN;
@@ -581,7 +590,7 @@ void NuSDBlockDevice::_sdh_irq()
 #if TARGET_NUMAKER_PFM_NUC472
     // TODO: Support IRQ
     
-#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487
+#elif TARGET_NUMAKER_IOT_M467 || TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487
     // FMI data abort interrupt
     if (_sdh_base->GINTSTS & SDH_GINTSTS_DTAIF_Msk) {
         _sdh_base->GINTSTS = SDH_GINTSTS_DTAIF_Msk;
@@ -593,8 +602,20 @@ void NuSDBlockDevice::_sdh_irq()
     if (_sdh_base->INTSTS & SDH_INTSTS_BLKDIF_Msk) {
         // block down
 #if MBED_MAJOR_VERSION >= 6
+#if TARGET_NUMAKER_IOT_M467
+        switch (NU_MODINDEX(_sdh)) {
+        case 0:
+            SD0.DataReadyFlag = TRUE;
+            break;
+
+        case 1:
+            SD1.DataReadyFlag = TRUE;
+            break;
+        }
+#elif TARGET_NUMAKER_PFM_M487 || TARGET_NUMAKER_IOT_M487
         extern uint8_t volatile g_u8SDDataReadyFlag;
         g_u8SDDataReadyFlag = TRUE;
+#endif
 #else
         extern uint8_t volatile _SDH_SDDataReady;
         _SDH_SDDataReady = TRUE;
