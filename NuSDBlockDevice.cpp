@@ -449,7 +449,7 @@ bd_size_t NuSDBlockDevice::size() const
         return SD_BLOCK_DEVICE_ERROR_NO_INIT;
     }
 
-    return 512 * _sectors;
+    return ((bd_size_t) 512) * _sectors;
 }
 
 void NuSDBlockDevice::debug(bool dbg)
