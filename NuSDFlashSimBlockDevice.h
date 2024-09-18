@@ -21,9 +21,17 @@
 
 #if TARGET_NUVOTON
 
-#include "NuSDBlockDevice.h"
-#include "platform/PlatformMutex.h"
 #include "mbed.h"
+#include "NuSDBlockDevice.h"
+/*
+ * Since mbed-os 5.14.0, rtos::Mutex has enabled to support both mbed-os
+ * and mbed-baremetal, and PlatformMutex becomes unneeded.
+ */
+#if MBED_MAJOR_VERSION >= 6
+#include "rtos/Mutex.h"
+#else
+#include "platform/PlatformMutex.h"
+#endif
 
 /* Simulate, based on NuSDBlockDevice, as flash block device
  *
@@ -107,7 +115,11 @@ public:
     virtual const char *get_type() const;
 
 private:
+#if MBED_MAJOR_VERSION >= 6
+    rtos::Mutex _lock;
+#else
     PlatformMutex _lock;
+#endif
 };
 
 #endif  /* TARGET_NUVOTON */

@@ -18,9 +18,17 @@
 
 #if TARGET_NUVOTON
 
-#include "BlockDevice.h"
-#include "platform/PlatformMutex.h"
 #include "mbed.h"
+#include "BlockDevice.h"
+/*
+ * Since mbed-os 5.14.0, rtos::Mutex has enabled to support both mbed-os
+ * and mbed-baremetal, and PlatformMutex becomes unneeded.
+ */
+#if MBED_MAJOR_VERSION >= 6
+#include "rtos/Mutex.h"
+#else
+#include "platform/PlatformMutex.h"
+#endif
 
 struct nu_modinit_s;
 
@@ -128,8 +136,12 @@ private:
 
     uint32_t _sectors;
     bool _dbg;
+#if MBED_MAJOR_VERSION >= 6
+    rtos::Mutex _lock;
+#else
     PlatformMutex _lock;
-    
+#endif
+
     const struct nu_modinit_s * _sdh_modinit;
     SDName      _sdh;
     SDH_T *     _sdh_base;
